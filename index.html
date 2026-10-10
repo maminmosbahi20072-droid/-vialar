@@ -151,10 +151,44 @@ async function renderLessons(){
 
 document.getElementById('lessonYear').addEventListener('change',renderLessons);
 function renderSources(){document.getElementById('sourceList').innerHTML=data.sources.length?data.sources.map(x=>'<div class="contentitem"><h4>'+esc(x.title)+'</h4><div>'+esc(x.details)+'</div>'+(String(x.details).startsWith('http')?'<a href="'+esc(x.details)+'" target="_blank" rel="noopener">فتح المصدر</a>':'')+'</div>').join(''):'<p class="muted">لا توجد مراجع مضافة بعد.</p>'}
-function login(){const id=document.getElementById('userId').value.trim(),pass=document.getElementById('userPass').value;document.getElementById('loginError').textContent='';
-if(id===ADMIN_ID&&pass===ADMIN_PASS){document.getElementById('loginBox').classList.add('hidden');document.getElementById('studentPanel').classList.add('hidden');document.getElementById('adminPanel').classList.remove('hidden');renderAdminStudents();return}
-const s=data.students.find(x=>x.id===id&&x.pass===pass);if(!s){document.getElementById('loginError').textContent='رقم الطالب أو كلمة السر خطأ';return}
-document.getElementById('loginBox').classList.add('hidden');document.getElementById('adminPanel').classList.add('hidden');document.getElementById('studentPanel').classList.remove('hidden');document.getElementById('studentName').textContent=s.name;document.getElementById('studentYear').textContent=s.year;document.getElementById('studentAbsences').textContent=s.absences}
+
+async function login() {
+  const email = document.getElementById('userId').value.trim();
+  const password = document.getElementById('userPass').value;
+  const errorEl = document.getElementById('loginError');
+
+  errorEl.textContent = '';
+
+  if (!email || !password) {
+    errorEl.textContent = 'أدخل البريد الإلكتروني وكلمة السر.';
+    return;
+  }
+
+  const { data, error } = await supabase.auth.signInWithPassword({
+    email,
+    password
+  });
+
+  if (error || !data.user) {
+    errorEl.textContent = 'البريد الإلكتروني أو كلمة السر غير صحيحة.';
+    return;
+  }
+
+  const { data: isAdmin, error: roleError } =
+    await supabase.rpc('is_admin');
+
+  if (roleError || isAdmin !== true) {
+    await supabase.auth.signOut();
+    errorEl.textContent = 'هذا الحساب غير مخوّل لدخول لوحة الإدارة.';
+    return;
+  }
+
+  document.getElementById('loginBox').classList.add('hidden');
+  document.getElementById('studentPanel').classList.add('hidden');
+  document.getElementById('adminPanel').classList.remove('hidden');
+
+  renderAdminStudents();
+}
 
 async function logout(){
   await supabase.auth.signOut();
