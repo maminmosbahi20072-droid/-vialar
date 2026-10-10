@@ -117,20 +117,113 @@ function renderSchedule(){let y=document.getElementById('scheduleYear').value;le
 document.getElementById('scheduleYear').addEventListener('change',renderSchedule);
 document.getElementById('editScheduleYear').addEventListener('change',loadScheduleEditor);
 function loadScheduleEditor(){const y=document.getElementById('editScheduleYear').value;document.getElementById('editSchedule').value=(data.schedules[y]||[]).map(r=>r.join(' | ')).join('\n')}
-function renderLessons(){const y=document.getElementById('lessonYear').value,arr=data.lessons.filter(x=>x.year===y);document.getElementById('lessonList').innerHTML=arr.length?arr.map(x=>'<div class="contentitem"><h4>'+esc(x.title)+'</h4><div>'+esc(x.details)+'</div>'+(String(x.details||'').trim().match(/^https?:\/\//)?'<p><a href="'+esc(String(x.details).trim())+'" target="_blank" rel="noopener noreferrer">فتح ملف المحاضرة أو الرابط</a></p>':'')+'<span class="small">'+esc(x.year)+'</span></div>').join(''):'<p class="muted">لا توجد دروس أو محاضرات منشورة لهذه السنة حاليًا.</p>'}
+
+async function renderLessons(){
+  const y = document.getElementById('lessonYear').value;
+  const list = document.getElementById('lessonList');
+
+  list.innerHTML = '<p class="muted">جارٍ تحميل المحاضرات...</p>';
+
+  const { data: rows, error } = await supabase
+    .from('lectures')
+    .select('year, title, details, content_type')
+    .eq('content_type', 'lesson')
+    .eq('year', y)
+    .order('title');
+
+  if(error){
+    console.error(error);
+    list.innerHTML = '<p class="muted">تعذر تحميل المحاضرات. تحقق من الاتصال والصلاحيات.</p>';
+    return;
+  }
+
+  list.innerHTML = rows.length ? rows.map(x =>
+    '<div class="contentitem"><h4>' + esc(x.title) +
+    '</h4><div>' + esc(x.details || '') + '</div>' +
+    (String(x.details || '').trim().match(/^https?:\/\//)
+      ? '<p><a href="' + esc(String(x.details).trim()) +
+        '" target="_blank" rel="noopener noreferrer">فتح ملف المحاضرة أو الرابط</a></p>'
+      : '') +
+    '<span class="small">' + esc(String(x.year)) +
+    '</span></div>'
+  ).join('') : '<p class="muted">لا توجد دروس أو محاضرات منشورة لهذه السنة حاليًا.</p>';
+}
+
 document.getElementById('lessonYear').addEventListener('change',renderLessons);
 function renderSources(){document.getElementById('sourceList').innerHTML=data.sources.length?data.sources.map(x=>'<div class="contentitem"><h4>'+esc(x.title)+'</h4><div>'+esc(x.details)+'</div>'+(String(x.details).startsWith('http')?'<a href="'+esc(x.details)+'" target="_blank" rel="noopener">فتح المصدر</a>':'')+'</div>').join(''):'<p class="muted">لا توجد مراجع مضافة بعد.</p>'}
 function login(){const id=document.getElementById('userId').value.trim(),pass=document.getElementById('userPass').value;document.getElementById('loginError').textContent='';
 if(id===ADMIN_ID&&pass===ADMIN_PASS){document.getElementById('loginBox').classList.add('hidden');document.getElementById('studentPanel').classList.add('hidden');document.getElementById('adminPanel').classList.remove('hidden');renderAdminStudents();return}
 const s=data.students.find(x=>x.id===id&&x.pass===pass);if(!s){document.getElementById('loginError').textContent='رقم الطالب أو كلمة السر خطأ';return}
 document.getElementById('loginBox').classList.add('hidden');document.getElementById('adminPanel').classList.add('hidden');document.getElementById('studentPanel').classList.remove('hidden');document.getElementById('studentName').textContent=s.name;document.getElementById('studentYear').textContent=s.year;document.getElementById('studentAbsences').textContent=s.absences}
-function logout(){['loginBox'].forEach(id=>document.getElementById(id).classList.remove('hidden'));['studentPanel','adminPanel'].forEach(id=>document.getElementById(id).classList.add('hidden'));document.getElementById('userId').value='';document.getElementById('userPass').value=''}
+
+async function logout(){
+  await supabase.auth.signOut();
+
+  ['loginBox'].forEach(id =>
+    document.getElementById(id).classList.remove('hidden')
+  );
+
+  ['studentPanel','adminPanel'].forEach(id =>
+    document.getElementById(id).classList.add('hidden')
+  );
+
+  document.getElementById('userId').value = '';
+  document.getElementById('userPass').value = '';
+}
+
 function saveStudent(){const id=document.getElementById('newId').value.trim(),pass=document.getElementById('newPass').value,name=document.getElementById('newName').value.trim();if(!id||!pass||!name){alert('يرجى إكمال بيانات الطالب');return}const s={id,pass,name,year:document.getElementById('newYear').value,absences:Math.max(0,Number(document.getElementById('newAbs').value)||0)};const i=data.students.findIndex(x=>x.id===id);if(i>=0)data.students[i]=s;else data.students.push(s);saveData();renderAdminStudents();alert('تم حفظ الطالب على هذا الجهاز')}
 function renderAdminStudents(){const el=document.getElementById('adminStudents');if(!el)return;el.innerHTML=data.students.length?data.students.map(s=>'<div class="contentitem"><b>'+esc(s.name)+'</b> — '+esc(s.id)+' · الغيابات: '+s.absences+' <button class="btn btn-light" onclick="editAbs('+JSON.stringify(s.id).replace(/"/g,'&quot;')+')">تعديل الغيابات</button> <button class="btn btn-light" onclick="deleteStudent('+JSON.stringify(s.id).replace(/"/g,'&quot;')+')">حذف</button></div>').join(''):'<p class="muted">لم تضف أي طالب بعد.</p>'}
 function editAbs(id){const s=data.students.find(x=>x.id===id);if(!s)return;const v=prompt('عدد الغيابات الجديد:',s.absences);if(v!==null&&v.trim()!==''&&Number(v)>=0){s.absences=Number(v);saveData();renderAdminStudents()}}
 function deleteStudent(id){if(confirm('هل تريد حذف حساب هذا الطالب؟')){data.students=data.students.filter(s=>s.id!==id);saveData();renderAdminStudents()}}
 function saveSchedule(){const y=document.getElementById('editScheduleYear').value;data.schedules[y]=document.getElementById('editSchedule').value.split('\n').map(line=>line.split('|').map(x=>x.trim())).filter(r=>r.length>=3&&r.some(Boolean));saveData();document.getElementById('scheduleYear').value=y;renderSchedule();alert('تم حفظ التوقيت في هذا المتصفح التجريبي')}
-function addItem(){const type=document.getElementById('itemType').value,y=document.getElementById('itemYear').value,title=document.getElementById('itemTitle').value.trim(),details=document.getElementById('itemDetails').value.trim();if(!title){alert('اكتب عنوان المحتوى');return}(type==='lesson'?data.lessons:data.sources).push({year:y,title,details});saveData();renderLessons();renderSources();document.getElementById('itemTitle').value='';document.getElementById('itemDetails').value='';alert('تمت إضافة المحتوى في هذا المتصفح')}
+
+async function addItem(){
+  const type = document.getElementById('itemType').value;
+  const y = document.getElementById('itemYear').value;
+  const title = document.getElementById('itemTitle').value.trim();
+  const details = document.getElementById('itemDetails').value.trim();
+
+  if(!title){
+    alert('اكتب عنوان المحتوى');
+    return;
+  }
+
+  const { data: { user }, error: userError } =
+    await supabase.auth.getUser();
+
+  if(userError || !user){
+    alert('يرجى تسجيل الدخول أولاً');
+    return;
+  }
+
+  const { error } = await supabase
+    .from('lectures')
+    .insert({
+      year: y,
+      title: title,
+      details: details,
+      content_type: type,
+      created_by: user.id
+    });
+
+  if(error){
+    alert('تعذرت إضافة المحتوى: ' + error.message);
+    return;
+  }
+
+  (type === 'lesson' ? data.lessons : data.sources)
+    .push({year: y, title: title, details: details});
+
+  saveData();
+  renderLessons();
+  renderSources();
+
+  document.getElementById('itemTitle').value = '';
+  document.getElementById('itemDetails').value = '';
+
+  alert('تمت إضافة المحتوى إلى قاعدة البيانات');
+}
+
 function addQuestion(){const q=document.getElementById('qText').value.trim(),correct=document.getElementById('qCorrect').value.trim(),wrong=document.getElementById('qWrong').value.trim();if(!q||!correct||!wrong){alert('أكمل السؤال والإجابتين');return}data.questions.push({q,correct,wrong});saveData();['qText','qCorrect','qWrong'].forEach(id=>document.getElementById(id).value='');qi=-1;nextQuiz();alert('تمت إضافة السؤال')}
 let qi=-1;function nextQuiz(){if(!data.questions.length)return;qi=(qi+1)%data.questions.length;const q=data.questions[qi];document.getElementById('quizQ').textContent=q.q;const answers=[q.correct,q.wrong].sort(()=>Math.random()-.5);document.getElementById('quizChoices').innerHTML=answers.map(a=>'<button class="btn btn-light" style="margin:4px" data-answer="'+esc(a)+'">'+esc(a)+'</button>').join('');document.querySelectorAll('#quizChoices button').forEach(b=>b.onclick=()=>{document.getElementById('quizResult').textContent=b.dataset.answer===data.questions[qi].correct?'إجابة صحيحة! أحسنت.':'ليست الإجابة الصحيحة، حاول مجددًا.'})}
 const chessGlyph={r:'♜',n:'♞',b:'♝',q:'♛',k:'♚',p:'♟',R:'♖',N:'♘',B:'♗',Q:'♕',K:'♔',P:'♙'};let chessBoard=[],picked=null,chessTurn='white';
