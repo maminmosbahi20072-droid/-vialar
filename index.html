@@ -95,7 +95,8 @@ main{max-width:1200px;margin:0 auto;padding:48px 18px}.home-heading{display:flex
 </section>
 </main>
 <footer><span>جامعة تيسمسيلت</span> · بوابة علوم الإنسان · تصميم تجريبي</footer>
-<script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+ <script>
  const SUPABASE_URL = 'https://kioxfpazkbpgkaddafrd.supabase.co';
 const SUPABASE_KEY = 'sb_publishable_QAK_2KKzYK7wEwv7IsXmCw_QfQkMCww';
 const supabase = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
@@ -272,6 +273,5 @@ function changeDirection(x,y){if(!snake.length)return;if(!(x===-direction.x&&y==
 document.addEventListener('keydown',e=>{const m={ArrowUp:[0,-1],ArrowDown:[0,1],ArrowLeft:[-1,0],ArrowRight:[1,0]}[e.key];if(m){changeDirection(m[0],m[1]);e.preventDefault()}});
 loadData();resetChess();nextQuiz();renderSchedule();renderLessons();renderSources();loadScheduleEditor();drawSnake();
 </script>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </body>
 </html>
